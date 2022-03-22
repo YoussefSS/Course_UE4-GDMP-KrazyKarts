@@ -28,13 +28,25 @@ void AGoKart::Tick(float DeltaTime)
 
 	FVector Acceleration = Force / Mass;
 
-	Velocity = Velocity + Acceleration* DeltaTime;
+	Velocity = Velocity + Acceleration * DeltaTime;
 
+	UpdateLocationFromVelocity(DeltaTime);
+
+
+}
+
+void AGoKart::UpdateLocationFromVelocity(float DeltaTime)
+{
 	FVector Translation = Velocity * DeltaTime * 100; // Multiplying by deltatime makes it just meters now, multiplying by 100 makes it centimeters. So now we are adding this movement per tick (20 meters per second)
-	AddActorWorldOffset(Translation);
+
+	FHitResult Hit;
+	AddActorWorldOffset(Translation, true, &Hit);
 
 	
-
+	if (Hit.IsValidBlockingHit())
+	{
+		Velocity = FVector::ZeroVector;
+	}
 }
 
 // Called to bind functionality to input

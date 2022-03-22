@@ -23,11 +23,15 @@ public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
+	
+
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 
 private:
+	void UpdateLocationFromVelocity(float DeltaTime);
+
 	// The mass of the car (kg)
 	UPROPERTY(EditAnywhere)
 	float Mass = 1000;

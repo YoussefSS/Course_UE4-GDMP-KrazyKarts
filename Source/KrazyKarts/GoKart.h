@@ -48,9 +48,9 @@ private:
 	UPROPERTY(EditAnywhere)
 	float MaxDrivingForce = 10000; //10000/1000 gives an acceleration of 10
 	
-	// The numbers of degrees rotated per second at full control throw (degrees/s)
+	// Minimum radius of the car turning curcle at full lock (m)
 	UPROPERTY(EditAnywhere)
-	float MaxDegreesPerSecond = 90;
+	float MinTurningRadius = 10; // 10 meters
 
 	// Higher means more drag. (kg/m)
 	UPROPERTY(EditAnywhere)
@@ -59,6 +59,7 @@ private:
 	// Higher means more rolling resistance
 	UPROPERTY(EditAnywhere)
 	float RollingResistanceCoefficient = 0.015; // From wikipedia rolling resistance (0.01 to 0.015
+
 
 	FVector Velocity;
 

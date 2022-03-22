@@ -32,7 +32,9 @@ public:
 
 
 private:
-	FVector GetResistance();
+	FVector GetAirResistance();
+
+	FVector GetRollingResistance();
 
 	void ApplyRotation(float DeltaTime);
 
@@ -53,6 +55,10 @@ private:
 	// Higher means more drag. (kg/m)
 	UPROPERTY(EditAnywhere)
 	float DragCoefficient = 16; // = 10000 / 25^2
+
+	// Higher means more rolling resistance
+	UPROPERTY(EditAnywhere)
+	float RollingResistanceCoefficient = 0.015; // From wikipedia rolling resistance (0.01 to 0.015
 
 	FVector Velocity;
 

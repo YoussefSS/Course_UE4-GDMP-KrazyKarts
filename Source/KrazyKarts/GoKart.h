@@ -32,6 +32,8 @@ public:
 
 
 private:
+	FVector GetResistance();
+
 	void ApplyRotation(float DeltaTime);
 
 	void UpdateLocationFromVelocity(float DeltaTime);
@@ -47,6 +49,10 @@ private:
 	// The numbers of degrees rotated per second at full control throw (degrees/s)
 	UPROPERTY(EditAnywhere)
 	float MaxDegreesPerSecond = 90;
+
+	// Higher means more drag. (kg/m)
+	UPROPERTY(EditAnywhere)
+	float DragCoefficient = 16; // = 10000 / 25^2
 
 	FVector Velocity;
 

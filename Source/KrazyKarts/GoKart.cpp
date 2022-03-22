@@ -24,8 +24,17 @@ void AGoKart::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	FVector Force = GetActorForwardVector() * MaxdrivingForce * Throttle;
+
+	FVector Acceleration = Force / Mass;
+
+	Velocity = Velocity + Acceleration* DeltaTime;
+
 	FVector Translation = Velocity * DeltaTime * 100; // Multiplying by deltatime makes it just meters now, multiplying by 100 makes it centimeters. So now we are adding this movement per tick (20 meters per second)
 	AddActorWorldOffset(Translation);
+
+	
+
 }
 
 // Called to bind functionality to input
@@ -39,6 +48,7 @@ void AGoKart::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 
 void AGoKart::MoveForward(float Value)
 {
-	Velocity = GetActorForwardVector() * 20 * Value; // Meters per second
+	Throttle = Value;
+	//Velocity = GetActorForwardVector() * 20 * Value; // Meters per second
 }
 

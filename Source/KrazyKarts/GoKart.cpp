@@ -21,6 +21,10 @@ void AGoKart::BeginPlay()
 {
 	Super::BeginPlay();
 	
+	if (HasAuthority())
+	{
+		NetUpdateFrequency = 1; // 1 update per second
+	}
 }
 
 FString GetEnumText(ENetRole Role)
@@ -60,19 +64,20 @@ void AGoKart::Tick(float DeltaTime)
 
 	UpdateLocationFromVelocity(DeltaTime);
 
+	/* We update the var every frame, but it gets replicated depending on the NetUpdateFrequency value
+	We only set the client transform when the variable is actually replicated, otherwise we simulate the movement locally*/
 	if (HasAuthority())
 	{
-		ReplicatedLocation = GetActorLocation(); // Just changing the value is enough to trigger the replication process that unreal does
-		ReplicatedRotation = GetActorRotation();
-	}
-	else
-	{
-		SetActorLocation(ReplicatedLocation); // If not the server, set actor location to the replicated location
-		SetActorRotation(ReplicatedRotation);
+		ReplicatedTransform = GetActorTransform(); // Just changing the value is enough to trigger the replication process that unreal does
 	}
 
 	DrawDebugString(GetWorld(), FVector(0, 0, 100), GetEnumText(GetLocalRole()), this, FColor::White, DeltaTime);
 
+}
+
+void AGoKart::OnRep_ReplicatedTransform()
+{
+	SetActorTransform(ReplicatedTransform);
 }
 
 FVector AGoKart::GetAirResistance()
@@ -132,8 +137,7 @@ void AGoKart::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeP
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(AGoKart, ReplicatedLocation); // This tells unreal that this variable should be replicated. Meaning when the client changes this value and replicates it, all the clients will get the updated value
-	DOREPLIFETIME(AGoKart, ReplicatedRotation);
+	DOREPLIFETIME(AGoKart, ReplicatedTransform); // This tells unreal that this variable should be replicated. Meaning when the client changes this value and replicates it, all the clients will get the updated value
 }
 
 void AGoKart::MoveForward(float Value)
@@ -168,4 +172,5 @@ bool AGoKart::Server_MoveRight_Validate(float Value)
 {
 	return FMath::Abs(Value) <= 1;
 }
+
 

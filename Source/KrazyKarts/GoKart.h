@@ -30,6 +30,8 @@ public:
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
+	void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 
 private:
 	FVector GetAirResistance();
@@ -60,9 +62,6 @@ private:
 	UPROPERTY(EditAnywhere)
 	float RollingResistanceCoefficient = 0.015; // From wikipedia rolling resistance (0.01 to 0.015
 
-
-	FVector Velocity;
-
 	void MoveForward(float Value);
 
 	void MoveRight(float Value);
@@ -72,6 +71,14 @@ private:
 
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_MoveRight(float Value);
+
+	FVector Velocity;
+
+	UPROPERTY(Replicated)
+	FVector ReplicatedLocation;
+
+	UPROPERTY(Replicated)
+	FRotator ReplicatedRotation;
 
 	float Throttle;
 	float SteeringThrow;

@@ -5,12 +5,15 @@
 
 #include "Components\InputComponent.h"
 #include "DrawDebugHelpers.h"
+#include "Net\UnrealNetwork.h"
+
 // Sets default values
 AGoKart::AGoKart()
 {
  	// Set this pawn to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
+	bReplicates = true; // Pawn replicates by default, but we do this anyway
 }
 
 // Called when the game starts or when spawned
@@ -56,6 +59,17 @@ void AGoKart::Tick(float DeltaTime)
 	ApplyRotation(DeltaTime);
 
 	UpdateLocationFromVelocity(DeltaTime);
+
+	if (HasAuthority())
+	{
+		ReplicatedLocation = GetActorLocation(); // Just changing the value is enough to trigger the replication process that unreal does
+		ReplicatedRotation = GetActorRotation();
+	}
+	else
+	{
+		SetActorLocation(ReplicatedLocation); // If not the server, set actor location to the replicated location
+		SetActorRotation(ReplicatedRotation);
+	}
 
 	DrawDebugString(GetWorld(), FVector(0, 0, 100), GetEnumText(GetLocalRole()), this, FColor::White, DeltaTime);
 
@@ -112,6 +126,14 @@ void AGoKart::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 	PlayerInputComponent->BindAxis("MoveForward", this, &AGoKart::MoveForward);
 	PlayerInputComponent->BindAxis("MoveRight", this, &AGoKart::MoveRight);
 
+}
+
+void AGoKart::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AGoKart, ReplicatedLocation); // This tells unreal that this variable should be replicated. Meaning when the client changes this value and replicates it, all the clients will get the updated value
+	DOREPLIFETIME(AGoKart, ReplicatedRotation);
 }
 
 void AGoKart::MoveForward(float Value)

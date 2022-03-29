@@ -2,8 +2,9 @@
 
 
 #include "GoKart.h"
-#include "Components\InputComponent.h"
 
+#include "Components\InputComponent.h"
+#include "DrawDebugHelpers.h"
 // Sets default values
 AGoKart::AGoKart()
 {
@@ -17,6 +18,23 @@ void AGoKart::BeginPlay()
 {
 	Super::BeginPlay();
 	
+}
+
+FString GetEnumText(ENetRole Role)
+{
+	switch (Role)
+	{
+	case ROLE_None:
+		return "None";
+	case ROLE_SimulatedProxy:
+		return "SimulatedProxy";
+	case ROLE_AutonomousProxy:
+		return "AutonomousProxy";
+	case ROLE_Authority:
+		return "Authority";
+	default:
+		return "ERROR";
+	}
 }
 
 // Called every frame
@@ -39,6 +57,7 @@ void AGoKart::Tick(float DeltaTime)
 
 	UpdateLocationFromVelocity(DeltaTime);
 
+	DrawDebugString(GetWorld(), FVector(0, 0, 100), GetEnumText(GetLocalRole()), this, FColor::White, DeltaTime);
 
 }
 
@@ -84,9 +103,27 @@ void AGoKart::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
-	PlayerInputComponent->BindAxis("MoveForward", this, &AGoKart::Server_MoveForward);
-	PlayerInputComponent->BindAxis("MoveRight", this, &AGoKart::Server_MoveRight);
+	/** To update the AutonomousProxy, we should
+		- Handle the bindings locally first
+		- Then pass them up to the server 
+		- We don't actually have to check if we are the AutonomousProxy here, 
+			since we know the AutonomousProxy is the only one that has the controller attached, so it is the only one that can receive input from the player controller. */
 
+	PlayerInputComponent->BindAxis("MoveForward", this, &AGoKart::MoveForward);
+	PlayerInputComponent->BindAxis("MoveRight", this, &AGoKart::MoveRight);
+
+}
+
+void AGoKart::MoveForward(float Value)
+{
+	Throttle = Value; // This means the player could cheat and set a high throttle value for themselves, but on the server we still have the validation in place
+	Server_MoveForward(Value);
+}
+
+void AGoKart::MoveRight(float Value)
+{
+	SteeringThrow = Value;
+	Server_MoveRight(Value);
 }
 
 void AGoKart::Server_MoveForward_Implementation(float Value)

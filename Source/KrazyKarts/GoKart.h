@@ -63,6 +63,10 @@ private:
 
 	FVector Velocity;
 
+	void MoveForward(float Value);
+
+	void MoveRight(float Value);
+
 	UFUNCTION(Server, Reliable, WithValidation) // Server RPC function + making it reliable
 	void Server_MoveForward(float Value);
 

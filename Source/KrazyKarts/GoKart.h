@@ -6,6 +6,53 @@
 #include "GameFramework/Pawn.h"
 #include "GoKart.generated.h"
 
+
+USTRUCT()
+struct FGoKartMove
+{
+	GENERATED_BODY()
+
+	/** We include the controls needed for simulation, we even include 
+	DeltaTime as it may be different between the client and the server */
+
+	UPROPERTY()
+	float Throttle;
+
+	UPROPERTY()
+	float SteeringThrow;
+
+	UPROPERTY()
+	float DeltaTime; // To be able to simulate the move
+
+	/** What if by chance, 2 moves were exactly the same ? We need to add something to identify them
+	*We use a Time var, so that when we receive the last move from the server, we can go through our list of unacknowledged moves, 
+		and check if they are before or equal to that last move. If they are before, we can remove them as they are old moves
+		And the greater/newer ones are the ones which will stay in that list and get replayed */
+	UPROPERTY()
+	float Time;
+};
+
+
+USTRUCT()
+struct FGoKartState
+{
+	GENERATED_BODY()
+
+	/** What comes down from the server */
+
+	UPROPERTY()
+	FTransform Transform;
+
+	UPROPERTY()
+	FVector Velocity;
+
+	/** Include the Move in order for the NON AutonomousProxy to be able to simulate. 
+	We are going to need the throttle in order to interpolate.
+	This is the last move that went into making this state */
+	UPROPERTY()
+	FGoKartMove LastMove;
+};
+
 UCLASS()
 class KRAZYKARTS_API AGoKart : public APawn
 {

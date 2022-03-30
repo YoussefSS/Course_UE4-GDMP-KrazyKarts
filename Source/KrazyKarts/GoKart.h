@@ -113,24 +113,28 @@ private:
 
 	void MoveRight(float Value);
 
-	UFUNCTION(Server, Reliable, WithValidation) // Server RPC function + making it reliable
-	void Server_MoveForward(float Value);
-
+	/** Reliable server RPC function */
 	UFUNCTION(Server, Reliable, WithValidation)
-	void Server_MoveRight(float Value);
+	void Server_SendMove(FGoKartMove Move);
 
-	UPROPERTY(Replicated)
-	FVector Velocity;
+	UPROPERTY(ReplicatedUsing = OnRep_ServerState)
+	FGoKartState ServerState; // We replicate this as it holds all the information
 
+	
+	FVector Velocity; // We keep this, but we keep it in sync with the server. So we replace that when we get the replicated state
+	/*
 	UPROPERTY(ReplicatedUsing=OnRep_ReplicatedTransform)
 	FTransform ReplicatedTransform;
-
+	*/
 	UFUNCTION()
-	void OnRep_ReplicatedTransform();
+	void OnRep_ServerState();
+	
 
 	UPROPERTY(Replicated)
 	float Throttle;
 
 	UPROPERTY(Replicated)
 	float SteeringThrow;
+
+	
 };

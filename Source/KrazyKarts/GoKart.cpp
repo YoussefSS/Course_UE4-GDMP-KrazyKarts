@@ -31,8 +31,7 @@ void AGoKart::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeP
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(AGoKart, ReplicatedTransform); // This tells unreal that this variable should be replicated. Meaning when the client changes this value and replicates it, all the clients will get the updated value
-	DOREPLIFETIME(AGoKart, Velocity);
+	DOREPLIFETIME(AGoKart, ServerState); // This tells unreal that this variable should be replicated. Meaning when the client changes this value and replicates it, all the clients will get the updated value
 	DOREPLIFETIME(AGoKart, Throttle);
 	DOREPLIFETIME(AGoKart, SteeringThrow);
 }
@@ -59,6 +58,18 @@ void AGoKart::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	if (IsLocallyControlled()) // We use this instead of checking for AutonomousProxy as it won't work for the server
+	{
+		FGoKartMove Move;
+		Move.DeltaTime = DeltaTime;
+		Move.SteeringThrow = SteeringThrow;
+		Move.Throttle = Throttle;
+		// TODO: Set Move.Time
+
+		Server_SendMove(Move);
+	}
+	
+
 	FVector Force = GetActorForwardVector() * MaxDrivingForce * Throttle;
 
 	Force += GetAirResistance();
@@ -74,20 +85,23 @@ void AGoKart::Tick(float DeltaTime)
 
 	UpdateLocationFromVelocity(DeltaTime);
 
-	/* We update the var every frame, but it gets replicated depending on the NetUpdateFrequency value
-	We only set the client transform when the variable is actually replicated, otherwise we simulate the movement locally*/
 	if (HasAuthority())
 	{
-		ReplicatedTransform = GetActorTransform(); // Just changing the value is enough to trigger the replication process that unreal does
+		// Pseudo Step: Sending the canonical state to the clients
+		ServerState.Transform = GetActorTransform();
+		ServerState.Velocity = Velocity;
+		// TODO: Update lat move
 	}
 
 	DrawDebugString(GetWorld(), FVector(0, 0, 100), GetEnumText(GetLocalRole()), this, FColor::White, DeltaTime);
 
 }
 
-void AGoKart::OnRep_ReplicatedTransform()
+void AGoKart::OnRep_ServerState()
 {
-	SetActorTransform(ReplicatedTransform);
+	// Pseudo Step: Reset to server state
+	SetActorTransform(ServerState.Transform);
+	Velocity = ServerState.Velocity;
 }
 
 FVector AGoKart::GetAirResistance()
@@ -148,34 +162,20 @@ void AGoKart::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 void AGoKart::MoveForward(float Value)
 {
 	Throttle = Value; // This means the player could cheat and set a high throttle value for themselves, but on the server we still have the validation in place
-	Server_MoveForward(Value);
 }
 
 void AGoKart::MoveRight(float Value)
 {
 	SteeringThrow = Value;
-	Server_MoveRight(Value);
 }
 
-void AGoKart::Server_MoveForward_Implementation(float Value)
+void AGoKart::Server_SendMove_Implementation(FGoKartMove Move)
 {
-	Throttle = Value;
-	//Velocity = GetActorForwardVector() * 20 * Value; // Meters per second
+	Throttle = Move.Throttle;
+	SteeringThrow = Move.SteeringThrow;
 }
 
-bool AGoKart::Server_MoveForward_Validate(float Value)
+bool AGoKart::Server_SendMove_Validate(FGoKartMove Move)
 {
-	return FMath::Abs(Value) <= 1; // -1 <= x <= 1
+	return true; // TODO: Make better validation
 }
-
-void AGoKart::Server_MoveRight_Implementation(float Value)
-{
-	SteeringThrow = Value;
-}
-
-bool AGoKart::Server_MoveRight_Validate(float Value)
-{
-	return FMath::Abs(Value) <= 1;
-}
-
-

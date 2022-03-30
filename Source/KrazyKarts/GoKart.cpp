@@ -6,6 +6,7 @@
 #include "Components\InputComponent.h"
 #include "DrawDebugHelpers.h"
 #include "Net\UnrealNetwork.h"
+#include "GameFramework\GameStateBase.h"
 
 // Sets default values
 AGoKart::AGoKart()
@@ -58,11 +59,15 @@ void AGoKart::Tick(float DeltaTime)
 
 	if (IsLocallyControlled()) // We use this instead of checking for AutonomousProxy as it won't work for the server
 	{
-		FGoKartMove Move;
-		Move.DeltaTime = DeltaTime;
-		Move.SteeringThrow = SteeringThrow;
-		Move.Throttle = Throttle;
-		// TODO: Set Move.Time
+		FGoKartMove Move = CreateMove(DeltaTime);
+
+		if (!HasAuthority()) // Don't add to the queue if you're the server, you don't need to
+		{
+			UnacknowledgedMoves.Add(Move);
+
+			UE_LOG(LogTemp, Warning, TEXT("Queue Length: %d"), UnacknowledgedMoves.Num());
+		}
+	
 
 		Server_SendMove(Move);
 
@@ -79,6 +84,8 @@ void AGoKart::OnRep_ServerState()
 	// Pseudo Step: Reset to server state
 	SetActorTransform(ServerState.Transform);
 	Velocity = ServerState.Velocity;
+
+	ClearAcknowledgeMoves(ServerState.LastMove);
 }
 
 void AGoKart::SimulateMove(FGoKartMove Move)
@@ -97,6 +104,33 @@ void AGoKart::SimulateMove(FGoKartMove Move)
 	ApplyRotation(Move.DeltaTime, Move.SteeringThrow);
 
 	UpdateLocationFromVelocity(Move.DeltaTime);
+}
+
+FGoKartMove AGoKart::CreateMove(float DeltaTime)
+{
+	FGoKartMove Move;
+	Move.DeltaTime = DeltaTime;
+	Move.SteeringThrow = SteeringThrow;
+	Move.Throttle = Throttle;
+	Move.Time = GetWorld()->GetGameState()->GetServerWorldTimeSeconds();
+
+	return Move;
+}
+
+void AGoKart::ClearAcknowledgeMoves(FGoKartMove LastMove)
+{
+	TArray<FGoKartMove> NewMoves;
+
+	// Adding only newer moves
+	for (const FGoKartMove& Move : UnacknowledgedMoves)
+	{
+		if (Move.Time > LastMove.Time)
+		{
+			NewMoves.Add(Move);
+		}
+	}
+
+	UnacknowledgedMoves = NewMoves;
 }
 
 FVector AGoKart::GetAirResistance()

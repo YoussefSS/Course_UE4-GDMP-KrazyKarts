@@ -86,9 +86,14 @@ void AGoKart::OnRep_ServerState()
 	Velocity = ServerState.Velocity;
 
 	ClearAcknowledgeMoves(ServerState.LastMove);
+
+	for (const FGoKartMove& Move : UnacknowledgedMoves)
+	{
+		SimulateMove(Move); // We cleared all the acknowledged moves, so we perform al the remaining unacknowledged ones
+	}
 }
 
-void AGoKart::SimulateMove(FGoKartMove Move)
+void AGoKart::SimulateMove(const FGoKartMove& Move)
 {
 	/* We don't want to get the input data from the actor, especially if we're not locally controlled..We want to get it from the Move */
 	

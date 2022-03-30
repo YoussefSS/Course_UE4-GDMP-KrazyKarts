@@ -81,11 +81,14 @@ public:
 
 
 private:
+
+	void SimulateMove(FGoKartMove Move);
+
 	FVector GetAirResistance();
 
 	FVector GetRollingResistance();
 
-	void ApplyRotation(float DeltaTime);
+	void ApplyRotation(float DeltaTime, float InSteeringThrow);
 
 	void UpdateLocationFromVelocity(float DeltaTime);
 
@@ -130,10 +133,7 @@ private:
 	void OnRep_ServerState();
 	
 
-	UPROPERTY(Replicated)
 	float Throttle;
-
-	UPROPERTY(Replicated)
 	float SteeringThrow;
 
 	

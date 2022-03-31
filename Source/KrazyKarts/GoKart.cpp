@@ -15,6 +15,8 @@ AGoKart::AGoKart()
 	PrimaryActorTick.bCanEverTick = true;
 
 	bReplicates = true; // Pawn replicates by default, but we do this anyway
+
+	MovementComponent = CreateDefaultSubobject<UGoKartMovementComponent>(TEXT("MovementComponent"));
 }
 
 // Called when the game starts or when spawned
@@ -57,11 +59,13 @@ void AGoKart::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	if (MovementComponent == nullptr) return;
+
 	/* Since all pawns show up as Authority when you're the server, we need to know whether we are the controlling pawn, or just the authority server and the pawn is controlled by someone else
 	 You could use GetRemoteRole() == ROLE_SimulatedProxy, which means you are not an AutonomousProxy on clients, which means you are the server, but this inconsistent, and it's better to use IsLocallyControlled */
 	if (GetLocalRole() == ROLE_Authority && IsLocallyControlled()) // This means we are the server, and the ones in control of this pawn.
 	{
-		FGoKartMove Move = CreateMove(DeltaTime);
+		FGoKartMove Move = MovementComponent->CreateMove(DeltaTime);
 		Server_SendMove(Move); // We don't have to call SimulateMove here as it is already called in Server_SendMove
 	}
 
@@ -69,8 +73,8 @@ void AGoKart::Tick(float DeltaTime)
 	// We are an AutonomousProxy, not a server
 	if (GetLocalRole() == ROLE_AutonomousProxy)
 	{
-		FGoKartMove Move = CreateMove(DeltaTime);
-		SimulateMove(Move);
+		FGoKartMove Move = MovementComponent->CreateMove(DeltaTime);
+		MovementComponent->SimulateMove(Move);
 
 		UnacknowledgedMoves.Add(Move);
 		Server_SendMove(Move);
@@ -80,7 +84,7 @@ void AGoKart::Tick(float DeltaTime)
 	// We need to simulate for the SimulatedProxy, because we weren't doing anything here, we were only setting the transform in OnRep_ServerState
 	if (GetLocalRole() == ROLE_SimulatedProxy)
 	{
-		SimulateMove(ServerState.LastMove); // WHY NOT CREATE A NEW MOVE?
+		MovementComponent->SimulateMove(ServerState.LastMove); // WHY NOT CREATE A NEW MOVE?
 	}
 
 	DrawDebugString(GetWorld(), FVector(0, 0, 100), GetEnumText(GetLocalRole()), this, FColor::White, DeltaTime);
@@ -88,45 +92,18 @@ void AGoKart::Tick(float DeltaTime)
 
 void AGoKart::OnRep_ServerState()
 {
+	if (MovementComponent == nullptr) return;
+
 	// Pseudo Step: Reset to server state
 	SetActorTransform(ServerState.Transform);
-	Velocity = ServerState.Velocity;
+	MovementComponent->SetVelocity(ServerState.Velocity);
 
 	ClearAcknowledgeMoves(ServerState.LastMove);
 
 	for (const FGoKartMove& Move : UnacknowledgedMoves)
 	{
-		SimulateMove(Move); // We cleared all the acknowledged moves, so we perform al the remaining unacknowledged ones
+		MovementComponent->SimulateMove(Move); // We cleared all the acknowledged moves, so we perform al the remaining unacknowledged ones
 	}
-}
-
-void AGoKart::SimulateMove(const FGoKartMove& Move)
-{
-	/* We don't want to get the input data from the actor, especially if we're not locally controlled..We want to get it from the Move */
-	
-	FVector Force = GetActorForwardVector() * MaxDrivingForce * Move.Throttle;
-
-	Force += GetAirResistance();
-	Force += GetRollingResistance();
-
-	FVector Acceleration = Force / Mass;
-
-	Velocity = Velocity + Acceleration * Move.DeltaTime;
-
-	ApplyRotation(Move.DeltaTime, Move.SteeringThrow);
-
-	UpdateLocationFromVelocity(Move.DeltaTime);
-}
-
-FGoKartMove AGoKart::CreateMove(float DeltaTime)
-{
-	FGoKartMove Move;
-	Move.DeltaTime = DeltaTime;
-	Move.SteeringThrow = SteeringThrow;
-	Move.Throttle = Throttle;
-	Move.Time = GetWorld()->GetGameState()->GetServerWorldTimeSeconds();
-
-	return Move;
 }
 
 void AGoKart::ClearAcknowledgeMoves(FGoKartMove LastMove)
@@ -145,42 +122,6 @@ void AGoKart::ClearAcknowledgeMoves(FGoKartMove LastMove)
 	UnacknowledgedMoves = NewMoves;
 }
 
-FVector AGoKart::GetAirResistance()
-{
-	return -Velocity.GetSafeNormal() * Velocity.SizeSquared() * DragCoefficient; // SizeSquared = Square(Velocity.Size())
-}
-
-FVector AGoKart::GetRollingResistance()
-{
-	float AccelerationDueToGravity = -GetWorld()->GetGravityZ() / 100;
-	float NormalForce = Mass * AccelerationDueToGravity;
-	return -Velocity.GetSafeNormal() * RollingResistanceCoefficient * NormalForce;
-}
-
-void AGoKart::ApplyRotation(float DeltaTime, float InSteeringThrow)
-{
-	float DeltaLocation = FVector::DotProduct(GetActorForwardVector(), Velocity) * DeltaTime; // Dot gives what portion of the velocity vector is in the forward, if negative, will give negative number
-	float RotationAngle = DeltaLocation / MinTurningRadius * InSteeringThrow;
-	FQuat RotationDelta(GetActorUpVector(), RotationAngle); // RotationAngle is in degrees, while this function takes radians
-
-	Velocity = RotationDelta.RotateVector(Velocity);
-
-	AddActorWorldRotation(RotationDelta);
-}
-
-void AGoKart::UpdateLocationFromVelocity(float DeltaTime)
-{
-	FVector Translation = Velocity * DeltaTime * 100; // Multiplying by deltatime makes it just meters now, multiplying by 100 makes it centimeters. So now we are adding this movement per tick (20 meters per second)
-
-	FHitResult Hit;
-	AddActorWorldOffset(Translation, true, &Hit);
-
-	
-	if (Hit.IsValidBlockingHit())
-	{
-		Velocity = FVector::ZeroVector;
-	}
-}
 
 // Called to bind functionality to input
 void AGoKart::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -202,22 +143,28 @@ void AGoKart::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 
 void AGoKart::MoveForward(float Value)
 {
-	Throttle = Value; // This means the player could cheat and set a high throttle value for themselves, but on the server we still have the validation in place
+	if (MovementComponent == nullptr) return;
+
+	MovementComponent->SetThrottle(Value); // This means the player could cheat and set a high throttle value for themselves, but on the server we still have the validation in place
 }
 
 void AGoKart::MoveRight(float Value)
 {
-	SteeringThrow = Value;
+	if (MovementComponent == nullptr) return;
+
+	MovementComponent->SetSteeringThrow(Value);
 }
 
 void AGoKart::Server_SendMove_Implementation(FGoKartMove Move)
 {
-	SimulateMove(Move);
+	if (MovementComponent == nullptr) return;
+
+	MovementComponent->SimulateMove(Move);
 
 	// After we simulated the move, we can update our canonical state
 	ServerState.LastMove = Move;
 	ServerState.Transform = GetActorTransform();
-	ServerState.Velocity = Velocity;
+	ServerState.Velocity = MovementComponent->GetVelocity();
 }
 
 bool AGoKart::Server_SendMove_Validate(FGoKartMove Move)

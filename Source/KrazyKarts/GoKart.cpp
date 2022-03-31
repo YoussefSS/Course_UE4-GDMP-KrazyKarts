@@ -54,7 +54,14 @@ void AGoKart::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	DrawDebugString(GetWorld(), FVector(0, 0, 100), GetEnumText(GetLocalRole()), this, FColor::White, DeltaTime);
+
+	// DEBUGGING
+	DrawDebugString(GetWorld(), FVector(0, 0, 140), "LocalRole: " + GetEnumText(GetLocalRole()), this, FColor::White, DeltaTime);
+	DrawDebugString(GetWorld(), FVector(0, 0, 120), "RemoteRole: " + GetEnumText(GetRemoteRole()), this, FColor::White, DeltaTime);
+	FString LocallyControlledString;
+	if (IsLocallyControlled()) LocallyControlledString = "true";
+	else LocallyControlledString = "false";
+	DrawDebugString(GetWorld(), FVector(0, 0, 100), "IsLocallyControlled: " + LocallyControlledString, this, FColor::White, DeltaTime);
 }
 
 

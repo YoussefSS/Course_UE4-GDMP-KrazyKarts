@@ -29,7 +29,14 @@ void UGoKartMovementComponent::TickComponent(float DeltaTime, ELevelTick TickTyp
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	// ...
+	// Can we use IsLocallyControlled instead of all this if statement?
+	// This means don't execute if we ARE the SimulatedProxy, or if we are the server and there is an AutonomousProxy on the other side
+	if (GetOwnerRole() == ROLE_AutonomousProxy || GetOwner()->GetRemoteRole() == ROLE_SimulatedProxy) 
+	{
+		LastMove = CreateMove(DeltaTime);
+		SimulateMove(LastMove);
+	}
+
 }
 
 

@@ -39,25 +39,24 @@ void UGoKartMovementReplicator::TickComponent(float DeltaTime, ELevelTick TickTy
 
 	if (MovementComponent == nullptr) return;
 
-	/* Since all pawns show up as Authority when you're the server, we need to know whether we are the controlling pawn, or just the authority server and the pawn is controlled by someone else
-	 You could use GetRemoteRole() == ROLE_SimulatedProxy, which means you are not an AutonomousProxy on clients, which means you are the server, but this inconsistent, and it's better to use IsLocallyControlled */
-	if (GetOwnerRole() == ROLE_Authority && Cast<APawn>(GetOwner())->IsLocallyControlled()) // This means we are the server, and the ones in control of this pawn.
-	{
-		FGoKartMove Move = MovementComponent->CreateMove(DeltaTime);
-		Server_SendMove(Move); // We don't have to call SimulateMove here as it is already called in Server_SendMove
-	}
-
+	FGoKartMove LastMove = MovementComponent->GetLastMove();
 
 	// We are an AutonomousProxy, not a server
 	if (GetOwnerRole() == ROLE_AutonomousProxy)
 	{
-		FGoKartMove Move = MovementComponent->CreateMove(DeltaTime);
-		MovementComponent->SimulateMove(Move);
+		/* Add move to the queue and send it to the server (!!!) where
+		   it would be simulated as Server-side ("Canonical" simulation) code */
 
-		UnacknowledgedMoves.Add(Move);
-		Server_SendMove(Move);
+		UnacknowledgedMoves.Add(LastMove);
+		Server_SendMove(LastMove);
 	}
 
+	/* Since all pawns show up as Authority when you're the server, we need to know whether we are the controlling pawn, or just the authority server and the pawn is controlled by someone else
+	 You could use GetRemoteRole() == ROLE_SimulatedProxy, which means you are not an AutonomousProxy on clients, which means you are the server, but this inconsistent, and it's better to use IsLocallyControlled */
+	if (GetOwner()->GetRemoteRole() == ROLE_SimulatedProxy) // This means we are the server, and the ones in control of this pawn.
+	{
+		UpdateServerState(LastMove);
+	}
 
 	// We need to simulate for the SimulatedProxy, because we weren't doing anything here, we were only setting the transform in OnRep_ServerState
 	if (GetOwnerRole() == ROLE_SimulatedProxy)
@@ -65,6 +64,13 @@ void UGoKartMovementReplicator::TickComponent(float DeltaTime, ELevelTick TickTy
 		MovementComponent->SimulateMove(ServerState.LastMove); // WHY NOT CREATE A NEW MOVE?
 	}
 
+}
+
+void UGoKartMovementReplicator::UpdateServerState(const FGoKartMove& Move)
+{
+	ServerState.LastMove = Move;
+	ServerState.Transform = GetOwner()->GetActorTransform();
+	ServerState.Velocity = MovementComponent->GetVelocity();
 }
 
 void UGoKartMovementReplicator::OnRep_ServerState()
@@ -105,10 +111,7 @@ void UGoKartMovementReplicator::Server_SendMove_Implementation(FGoKartMove Move)
 
 	MovementComponent->SimulateMove(Move);
 
-	// After we simulated the move, we can update our canonical state
-	ServerState.LastMove = Move;
-	ServerState.Transform = GetOwner()->GetActorTransform();
-	ServerState.Velocity = MovementComponent->GetVelocity();
+	UpdateServerState(Move);
 }
 
 bool UGoKartMovementReplicator::Server_SendMove_Validate(FGoKartMove Move)

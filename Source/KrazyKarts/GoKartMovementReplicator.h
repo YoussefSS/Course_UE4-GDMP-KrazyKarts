@@ -52,6 +52,8 @@ private:
 
 	void ClearAcknowledgeMoves(FGoKartMove LastMove);
 
+	void  UpdateServerState(const FGoKartMove& Move);
+
 	/** Reliable server RPC function */
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_SendMove(FGoKartMove Move);

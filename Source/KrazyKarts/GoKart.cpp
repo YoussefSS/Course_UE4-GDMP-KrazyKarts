@@ -57,24 +57,31 @@ void AGoKart::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (IsLocallyControlled()) // We use this instead of checking for AutonomousProxy as it won't work for the server
+	/* Since all pawns show up as Authority when you're the server, we need to know whether we are the controlling pawn, or just the authority server and the pawn is controlled by someone else
+	 You could use GetRemoteRole() == ROLE_SimulatedProxy, which means you are not an AutonomousProxy on clients, which means you are the server, but this inconsistent, and it's better to use IsLocallyControlled */
+	if (GetLocalRole() == ROLE_Authority && IsLocallyControlled()) // This means we are the server, and the ones in control of this pawn.
 	{
 		FGoKartMove Move = CreateMove(DeltaTime);
-
-		if (!HasAuthority()) // Don't add to the queue if you're the server, you don't need to
-		{
-			UnacknowledgedMoves.Add(Move);
-
-			UE_LOG(LogTemp, Warning, TEXT("Queue Length: %d"), UnacknowledgedMoves.Num());
-		}
-	
-
-		Server_SendMove(Move);
-
-		// Calling SimulateMove multiple times on the server this way, since Server_SendMove calls SimulateMove
-		SimulateMove(Move);
+		Server_SendMove(Move); // We don't have to call SimulateMove here as it is already called in Server_SendMove
 	}
-	
+
+
+	// We are an AutonomousProxy, not a server
+	if (GetLocalRole() == ROLE_AutonomousProxy)
+	{
+		FGoKartMove Move = CreateMove(DeltaTime);
+		SimulateMove(Move);
+
+		UnacknowledgedMoves.Add(Move);
+		Server_SendMove(Move);
+	}
+
+
+	// We need to simulate for the SimulatedProxy, because we weren't doing anything here, we were only setting the transform in OnRep_ServerState
+	if (GetLocalRole() == ROLE_SimulatedProxy)
+	{
+		SimulateMove(ServerState.LastMove); // WHY NOT CREATE A NEW MOVE?
+	}
 
 	DrawDebugString(GetWorld(), FVector(0, 0, 100), GetEnumText(GetLocalRole()), this, FColor::White, DeltaTime);
 }
